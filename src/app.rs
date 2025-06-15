@@ -60,7 +60,7 @@ impl App {
         if self.popup.is_some() {
             // Handle popup input
             self.popup = None; // Reassign the popup if needed
-            return false;
+            return true;
         }
         match key.code {
             crossterm::event::KeyCode::Char('q') => return false, // Quit
