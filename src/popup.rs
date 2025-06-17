@@ -1,11 +1,11 @@
 use crate::app::Request;
-use crate::window::{Window, WindowTransition};
+use crate::window::Window; // Removed WindowTransition
 use crossterm::event::KeyEvent;
 use ratatui::widgets::Clear;
 use ratatui::{
     Frame,
-    backend::Backend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    // backend::Backend, // Removed
+    layout::{Alignment, Rect}, // Removed Constraint, Direction, Layout
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, Paragraph},
 };
@@ -27,7 +27,7 @@ impl PopupType {
     }
 
     pub fn style(&self) -> ratatui::style::Style {
-        use ratatui::style::{Color, Modifier, Style};
+        // Removed redundant use statement: use ratatui::style::{Color, Modifier, Style};
         match self {
             PopupType::Info => Style::default()
                 .fg(Color::Blue)

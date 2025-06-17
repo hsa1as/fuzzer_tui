@@ -1,7 +1,7 @@
 // windows/main_window.rs
 use crate::app::Request;
 use crate::popup::{Popup, PopupType};
-use crate::window::{Window, WindowTransition};
+use crate::window::Window; // Removed WindowTransition
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::*, widgets::*};
 

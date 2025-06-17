@@ -11,7 +11,6 @@ use crossterm::{
 };
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
-use windows::main_window::MainWindow;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode()?;
@@ -20,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let mut app = App::new(Box::new(MainWindow::new()));
+    let mut app = App::new();
 
     loop {
         terminal.draw(|f| app.render(f))?;

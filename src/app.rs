@@ -1,7 +1,8 @@
 // app.rs
 use crate::{
     popup::*,
-    window::{Window, WindowTransition},
+    window::Window, // Removed WindowTransition
+    windows::project_window::ProjectWindow, // Added
 };
 use crossterm::event::KeyEvent;
 use ratatui::{Frame, prelude::*, widgets::Paragraph};
@@ -37,6 +38,7 @@ pub trait Property: std::fmt::Debug {
 
 pub enum Request {
     Popup(Popup),
+    PushWindow(Box<dyn Window>), // New request to push a window
 }
 
 pub struct App {
@@ -46,9 +48,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(initial_window: Box<dyn Window>) -> Self {
-        let mut stack = VecDeque::new();
-        stack.push_back(initial_window);
+    pub fn new() -> Self { // Removed initial_window parameter
+        let mut stack: VecDeque<Box<dyn Window>> = VecDeque::new(); // Explicitly typed
+        // Push ProjectWindow first
+        stack.push_back(Box::new(ProjectWindow::new())); // Coercion will happen here
         App {
             window_stack: stack,
             properties: HashMap::new(),
@@ -85,7 +88,7 @@ impl App {
     }
 
     pub fn render(&mut self, f: &mut Frame) {
-        let size = f.size();
+        let area = f.area(); // Changed from f.size()
 
         // Layout
         let chunks = Layout::default()
@@ -95,7 +98,7 @@ impl App {
                 Constraint::Min(0),
                 Constraint::Length(3),
             ])
-            .split(size);
+            .split(area); // Changed from size
 
         // Header
         let header = Paragraph::new("FlashFuzz v1.0")
@@ -132,7 +135,7 @@ impl App {
             }
         }
         if let Some(p) = self.popup.as_mut() {
-            let area_popup = centered_rect(30, 20, size);
+            let area_popup = centered_rect(30, 20, area); // Changed from size
             p.render(f, area_popup);
         }
     }
@@ -141,6 +144,9 @@ impl App {
         match req {
             Request::Popup(popup) => {
                 self.popup = Some(popup);
+            }
+            Request::PushWindow(new_window) => { // New handler
+                self.window_stack.push_back(new_window);
             }
         }
     }
