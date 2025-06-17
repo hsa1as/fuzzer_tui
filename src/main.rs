@@ -1,15 +1,16 @@
 // main.rs
 mod app;
 mod popup;
+mod utils;
 mod window;
 mod windows;
 
 use app::App;
 use crossterm::{
     event, execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::{Terminal, backend::CrosstermBackend};
+use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

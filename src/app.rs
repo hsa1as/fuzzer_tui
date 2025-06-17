@@ -1,34 +1,13 @@
 // app.rs
+use crate::utils::centered_rect::centered_rect;
 use crate::{
     popup::*,
-    window::Window, // Removed WindowTransition
+    window::Window,                         // Removed WindowTransition
     windows::project_window::ProjectWindow, // Added
 };
 use crossterm::event::KeyEvent;
-use ratatui::{Frame, prelude::*, widgets::Paragraph};
+use ratatui::{prelude::*, widgets::Paragraph, Frame};
 use std::collections::{HashMap, VecDeque};
-
-pub fn centered_rect(percent_x: u16, percent_y: u16, parent_area: Rect) -> Rect {
-    let vertical_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(parent_area);
-
-    let horizontal_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(vertical_chunks[1]);
-
-    horizontal_chunks[1]
-}
 
 pub trait Property: std::fmt::Debug {
     fn id(&self) -> &str;
@@ -39,6 +18,7 @@ pub trait Property: std::fmt::Debug {
 pub enum Request {
     Popup(Popup),
     PushWindow(Box<dyn Window>), // New request to push a window
+    PopWindow,
 }
 
 pub struct App {
@@ -48,9 +28,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self { // Removed initial_window parameter
+    pub fn new() -> Self {
+        // Removed initial_window parameter
         let mut stack: VecDeque<Box<dyn Window>> = VecDeque::new(); // Explicitly typed
-        // Push ProjectWindow first
+                                                                    // Push ProjectWindow first
         stack.push_back(Box::new(ProjectWindow::new())); // Coercion will happen here
         App {
             window_stack: stack,
@@ -60,28 +41,36 @@ impl App {
     }
 
     pub fn handle_input(&mut self, key: KeyEvent) -> bool {
+        let mut reqs = None;
         if self.popup.is_some() {
             // Handle popup input
             self.popup = None; // Reassign the popup if needed
             return true;
         }
-        match key.code {
-            crossterm::event::KeyCode::Char('q') => return false, // Quit
-            crossterm::event::KeyCode::Char('b') => {
-                self.window_stack.pop_back();
-                if self.window_stack.is_empty() {
-                    return false;
-                }
-            }
-            _ => {
-                if let Some(current) = self.window_stack.back_mut() {
-                    let reqs = current.handle_input(key);
-                    if let Some(reqs) = reqs {
-                        for req in reqs {
-                            self.handle_request(req);
-                        }
+        if self.window_stack.back_mut().is_some()
+            && self.window_stack.back().unwrap().capture_all_input()
+        {
+            // If there's a current window, check if it captures all input
+            reqs = self.window_stack.back_mut().unwrap().handle_input(key);
+        } else {
+            match key.code {
+                crossterm::event::KeyCode::Char('q') => return false, // Quit
+                crossterm::event::KeyCode::Char('b') => {
+                    self.window_stack.pop_back();
+                    if self.window_stack.is_empty() {
+                        return false;
                     }
                 }
+                _ => {
+                    if let Some(current) = self.window_stack.back_mut() {
+                        reqs = current.handle_input(key);
+                    }
+                }
+            }
+        }
+        if let Some(reqs) = reqs {
+            for req in reqs {
+                self.handle_request(req);
             }
         }
         true
@@ -145,8 +134,15 @@ impl App {
             Request::Popup(popup) => {
                 self.popup = Some(popup);
             }
-            Request::PushWindow(new_window) => { // New handler
+            Request::PushWindow(new_window) => {
+                // New handler
                 self.window_stack.push_back(new_window);
+            }
+            Request::PopWindow => {
+                if self.window_stack.len() > 1 {
+                    self.window_stack.pop_back();
+                } else {
+                }
             }
         }
     }
