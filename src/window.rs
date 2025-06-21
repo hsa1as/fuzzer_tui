@@ -11,9 +11,3 @@ pub trait Window {
         false
     }
 }
-
-pub enum WindowTransition {
-    Push(Box<dyn Window>),
-    Pop,
-    None,
-}

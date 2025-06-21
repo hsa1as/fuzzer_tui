@@ -30,7 +30,7 @@ impl Window for MainWindow {
     }
 
     fn render(&mut self, f: &mut Frame, area: Rect) -> Option<Vec<Request>> {
-        let mut ret = None;
+        let ret = None;
         let vertical_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(40), Constraint::Min(5)])
@@ -76,7 +76,7 @@ impl Window for MainWindow {
         let list = List::new(items).block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("=== Options ===")
+                .title("Options")
                 .title_alignment(Alignment::Center)
                 .title_style(Style::new().bold()),
         );
