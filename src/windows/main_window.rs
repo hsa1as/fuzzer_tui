@@ -2,6 +2,7 @@
 use crate::app::Request;
 use crate::popup::{Popup, PopupType};
 use crate::window::Window; // Removed WindowTransition
+use crate::windows::config::ConfigWindow;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::*, widgets::*};
 
@@ -17,7 +18,7 @@ impl MainWindow {
             options: vec![
                 "Static analysis".into(),
                 "Fuzz !".into(),
-                "Settings".into(),
+                "Config".into(),
                 "Quit".into(),
             ],
         }
@@ -103,6 +104,11 @@ impl Window for MainWindow {
                     PopupType::Info,
                     "You selected: ".to_string() + &self.options[self.selected],
                 ))]);
+
+                if &self.options[self.selected] == "Config" {
+                    // Config
+                    ret = Some(vec![Request::PushWindow(Box::new(ConfigWindow::new()))]);
+                }
             }
             _ => {}
         }

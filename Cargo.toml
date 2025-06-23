@@ -7,6 +7,18 @@ edition = "2021"
 crossterm = "0.28.1" # Downgraded to match ratatui's dependency
 ratatui = "0.29.0"
 ratatui-explorer = "0.2.0"
+flashfuzzemu = { path = "../FlashFuzz/flashfuzzemu" , default-features = false, optional = true}
 
 [dev-dependencies]
 tempfile = "3.10.1"
+
+[features]
+for_fuzzer = ["flashfuzzemu", "mem_access_rules", "track_unique_bb", "flashfuzzemu/default", "interrupts_list", "grammar_rules"]
+interrupts_fixed = ["flashfuzzemu/interrupts_fixed"]
+interrupts_guided = ["flashfuzzemu/interrupts_guided"]
+mem_access_rules = ["flashfuzzemu/mem_access_rules"]
+track_unique_bb = ["flashfuzzemu/track_unique_bb"]
+track_hit_feedbacks = ["flashfuzzemu/track_hit_feedbacks"]
+debug = ["flashfuzzemu/debug"]
+grammar_rules = ["flashfuzzemu/grammar_rules"]
+interrupts_list = ["flashfuzzemu/interrupts_list"]
