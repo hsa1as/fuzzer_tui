@@ -8,6 +8,8 @@ crossterm = "0.28.1" # Downgraded to match ratatui's dependency
 ratatui = "0.29.0"
 ratatui-explorer = "0.2.0"
 flashfuzzemu = { path = "../FlashFuzz/flashfuzzemu" , default-features = false, optional = true}
+serde_json = "*"
+serde = "*"
 
 [dev-dependencies]
 tempfile = "3.10.1"

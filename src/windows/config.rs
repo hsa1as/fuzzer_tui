@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 #![allow(unused)]
+use std::fs::read_to_string;
 use std::path::PathBuf;
 
-use ratatui::style::{Modifier, Stylize};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout};
+use ratatui::style::{Modifier, Style, Stylize};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph};
 
 use crate::app::Request;
 use crate::window::Window;
@@ -28,14 +30,30 @@ pub struct ConfigWindow {
 
 impl ConfigWindow {
     pub fn new() -> Self {
-        Self {
+        let mut ret = Self {
             state: ConfigWindowState::Main,
             config_file: None,
-            config_json: None,
+            config_json: Some("Config string not read yet!".to_string()),
             selected_idx: 0,
             options: vec!["From script".into(), "Manual configuration".into()],
             config_options: vec![],
-        }
+        };
+        ret.load_config_file();
+        ret.load_config_str();
+        ret
+    }
+
+    pub fn load_config_file(&mut self) {
+        let mut p = PathBuf::from("./");
+        p.set_file_name("config.json");
+        self.config_file = Some(p);
+    }
+
+    pub fn load_config_str(&mut self) {
+        self.config_json = match read_to_string(self.config_file.as_ref().unwrap()) {
+            Ok(s) => Some(s),
+            Err(e) => Some(format!("Error reading config file: {}", e)),
+        };
     }
     fn render_main(
         &mut self,
@@ -64,7 +82,18 @@ impl ConfigWindow {
                 .borders(Borders::ALL)
                 .title("Configuration Options"),
         );
-        f.render_widget(list, area);
+        let horizontal_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area);
+
+        f.render_widget(list, horizontal_chunks[0]);
+        let config_str = Paragraph::new(self.config_json.as_ref().unwrap().as_str())
+            .style(Style::default())
+            .alignment(Alignment::Left)
+            .block(Block::new().borders(Borders::ALL));
+        f.render_widget(config_str, horizontal_chunks[1]);
         None
     }
 
@@ -79,7 +108,7 @@ impl ConfigWindow {
             .borders(Borders::ALL)
             .title("Manual Configuration")
             .title_style(ratatui::style::Style::default().fg(ratatui::style::Color::Green));
-        f.render_widget(block, area);
+        f.render_widget(block, area); // menu items
         None
     }
 }

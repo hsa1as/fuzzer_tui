@@ -1,19 +1,23 @@
-// src/windows/project_window.rs
 use crate::utils::centered_rect::centered_rect;
 use crate::utils::input_dialogue::InputDialogue; // Removed ExplorerInput
 use crate::window::Window;
 use crate::windows::main_window::MainWindow;
 use crate::{app::Request, utils::input_dialogue::InputDialogueResult};
-use crossterm::event::KeyEvent; // Keep KeyEvent for our main input matching
-                                // Removed: use ratatui::crossterm::event::{Event as RatatuiCrosstermEvent, KeyEvent as RatatuiKeyEvent};
-                                // We will use fully qualified paths for ratatui::crossterm::event::Event to avoid import warnings if not used elsewhere.
-use ratatui::{prelude::*, widgets::*};
-use std::fs;
-use std::path::Path; // PathBuf is unused for now, Path is sufficient for helpers
-                     // Removed PathBuf from use std::path::{Path, PathBuf};
-use ratatui_explorer::{FileExplorer, Theme}; // Removed ExplorerInput
 
-// Helper functions (create_project_structure, validate_project_structure) remain unchanged
+use crossterm::event::KeyEvent;
+
+use ratatui::{prelude::*, widgets::*};
+use ratatui_explorer::{FileExplorer, Theme};
+
+use std::fs;
+use std::path::Path;
+
+#[cfg(feature = "for_fuzzer")]
+use flashfuzzemu::opts::EmuOpts;
+#[cfg(feature = "for_fuzzer")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "for_fuzzer")]
+use serde_json;
 pub fn create_project_structure(project_path: &Path) -> Result<(), String> {
     let corpus_path = project_path.join("corpus");
     let crashes_path = project_path.join("crashes");
@@ -26,6 +30,13 @@ pub fn create_project_structure(project_path: &Path) -> Result<(), String> {
         .map_err(|e| format!("Failed to create crashes directory: {}", e))?;
     fs::File::create(&config_file).map_err(|e| format!("Failed to create config.json: {}", e))?;
     fs::File::create(&grammar_file).map_err(|e| format!("Failed to create grammar.json: {}", e))?;
+    #[cfg(feature = "for_fuzzer")]
+    {
+        // create a dummy config.json using emuopts defaults
+        let write_str =
+            serde_json::to_string_pretty(&EmuOpts::default()).map_err(|e| e.to_string())?;
+        fs::write(&config_file, write_str).map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -75,6 +86,27 @@ impl ProjectWindow {
             state: ProjectWindowState::SelectingAction,
             explorer: FileExplorer::with_theme(theme).unwrap(),
         }
+    }
+
+    fn set_current_dir(&mut self, path: &Path) -> Option<Vec<Request>> {
+        match std::env::set_current_dir(&path) {
+            Ok(_) => {
+                return Some(vec![
+                    Request::PopWindow,
+                    Request::PushWindow(Box::new(MainWindow::new())),
+                    Request::Popup(crate::popup::Popup::new(
+                        crate::popup::PopupType::Success,
+                        format!("Project opened successfully at: {}", path.display()),
+                    )),
+                ]);
+            }
+            Err(e) => {
+                return Some(vec![Request::Popup(crate::popup::Popup::new(
+                    crate::popup::PopupType::Warning,
+                    format!("Failed to set current directory: {}", e),
+                ))]);
+            }
+        };
     }
 }
 
@@ -207,32 +239,7 @@ impl Window for ProjectWindow {
                             let new_project_path = project_path_buf.join(str);
                             match create_project_structure(&new_project_path) {
                                 Ok(_) => {
-                                    match std::env::set_current_dir(&new_project_path) {
-                                        Ok(_) => {
-                                            return Some(vec![
-                                                Request::PopWindow,
-                                                Request::PushWindow(Box::new(MainWindow::new())),
-                                                Request::Popup(crate::popup::Popup::new(
-                                                    crate::popup::PopupType::Success,
-                                                    format!(
-                                                        "Project created successfully at: {}",
-                                                        new_project_path.display()
-                                                    ),
-                                                )),
-                                            ]);
-                                        }
-                                        Err(e) => {
-                                            return Some(vec![Request::Popup(
-                                                crate::popup::Popup::new(
-                                                    crate::popup::PopupType::Warning,
-                                                    format!(
-                                                        "Failed to set current directory: {}",
-                                                        e
-                                                    ),
-                                                ),
-                                            )]);
-                                        }
-                                    };
+                                    return self.set_current_dir(&new_project_path);
                                 }
                                 Err(e) => {
                                     return Some(vec![Request::Popup(crate::popup::Popup::new(
@@ -285,35 +292,18 @@ impl Window for ProjectWindow {
             ProjectWindowState::BrowsingForOpen => {
                 // key is crossterm::event::KeyEvent.
                 // ratatui_explorer expects ratatui::crossterm::event::Event.
-                // ratatui::crossterm::event::KeyEvent is an alias for ::crossterm::event::KeyEvent if versions align.
-                // So, key can be used directly if types are compatible.
-                // The error E0277 indicates the From<&crossterm::event::Event> is not implemented for Input.
-                // It expects From<&ratatui::crossterm::event::Event>.
-                // So we must construct a ratatui::crossterm::event::Event.
                 let r_event = ratatui::crossterm::event::Event::Key(key);
                 if key.code == crossterm::event::KeyCode::Enter {
                     if self.explorer.selected_idx() < self.explorer.files().len() {
                         let selected_file_info =
                             &self.explorer.files()[self.explorer.selected_idx()];
-                        // Use the method .path() as suggested by compiler (E0616)
                         let project_path_buf = selected_file_info.path().to_path_buf();
                         // For "Open Existing Project", we expect to select the project root directory.
                         if selected_file_info.is_dir() {
                             // Ensure selection is a directory for these actions
                             self.state = ProjectWindowState::SelectingAction;
                             match validate_project_structure(&project_path_buf) {
-                                Ok(_) => {
-                                    return Some(vec![
-                                        Request::PushWindow(Box::new(MainWindow::new())),
-                                        Request::Popup(crate::popup::Popup::new(
-                                            crate::popup::PopupType::Success,
-                                            format!(
-                                                "Opened project: {}",
-                                                project_path_buf.display()
-                                            ),
-                                        )),
-                                    ])
-                                }
+                                Ok(_) => return self.set_current_dir(&project_path_buf),
                                 Err(e) => {
                                     return Some(vec![Request::Popup(crate::popup::Popup::new(
                                         crate::popup::PopupType::Warning,

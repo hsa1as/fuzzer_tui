@@ -517,6 +517,8 @@ dependencies = [
  "flashfuzzemu",
  "ratatui",
  "ratatui-explorer",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 
