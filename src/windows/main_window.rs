@@ -77,6 +77,7 @@ impl Window for MainWindow {
         let list = List::new(items).block(
             Block::default()
                 .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
                 .title("Options")
                 .title_alignment(Alignment::Center)
                 .title_style(Style::new().bold()),
@@ -99,12 +100,6 @@ impl Window for MainWindow {
                 }
             }
             KeyCode::Enter => {
-                // Future: return different transitions based on selected option
-                ret = Some(vec![Request::Popup(Popup::new(
-                    PopupType::Info,
-                    "You selected: ".to_string() + &self.options[self.selected],
-                ))]);
-
                 if &self.options[self.selected] == "Config" {
                     // Config
                     ret = Some(vec![Request::PushWindow(Box::new(ConfigWindow::new()))]);

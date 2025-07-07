@@ -1,7 +1,7 @@
 use crate::app::Request;
 use crate::window::Window; // Removed WindowTransition
 use crossterm::event::KeyEvent;
-use ratatui::widgets::{Clear, Wrap};
+use ratatui::widgets::{BorderType, Clear, Wrap};
 use ratatui::{
     // backend::Backend, // Removed
     layout::{Alignment, Rect}, // Removed Constraint, Direction, Layout
@@ -68,6 +68,7 @@ impl Window for Popup {
             .title(self.popup_type.title())
             .title_style(self.popup_type.style())
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .style(Style::default().bg(Color::Black).fg(Color::White));
 
         let paragraph = Paragraph::new(self.message.as_str())

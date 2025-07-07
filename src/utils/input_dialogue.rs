@@ -83,12 +83,17 @@ impl InputDialogue {
         let input_para = Paragraph::new(input_with_cursor.as_str())
             .style(Style::default().fg(Color::White))
             .alignment(Alignment::Left)
-            .block(Block::default().borders(Borders::ALL));
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(ratatui::widgets::BorderType::Rounded),
+            );
 
         // Wrap everything in a Block
         let block = Block::default()
             .title(self.title.as_str())
             .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
             .style(Style::default().bg(Color::Black).fg(Color::White));
 
         // Render the block

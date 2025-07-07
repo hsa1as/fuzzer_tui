@@ -1,4 +1,5 @@
-use crate::utils::centered_rect::centered_rect;
+use crate::utils::centered_rect::{self, centered_rect};
+use crate::utils::file_dialogue::{FileDialogue, FileDialogueResult};
 use crate::utils::input_dialogue::InputDialogue; // Removed ExplorerInput
 use crate::window::Window;
 use crate::windows::main_window::MainWindow;
@@ -7,7 +8,6 @@ use crate::{app::Request, utils::input_dialogue::InputDialogueResult};
 use crossterm::event::KeyEvent;
 
 use ratatui::{prelude::*, widgets::*};
-use ratatui_explorer::{FileExplorer, Theme};
 
 use std::fs;
 use std::path::Path;
@@ -71,12 +71,11 @@ pub struct ProjectWindow {
     selected_index: usize,
     options: Vec<String>,
     state: ProjectWindowState,
-    explorer: FileExplorer,
+    explorer: FileDialogue,
 }
 
 impl ProjectWindow {
     pub fn new() -> Self {
-        let theme = Theme::default().add_default_title();
         Self {
             selected_index: 0,
             options: vec![
@@ -84,7 +83,7 @@ impl ProjectWindow {
                 "Open Existing Project".to_string(),
             ],
             state: ProjectWindowState::SelectingAction,
-            explorer: FileExplorer::with_theme(theme).unwrap(),
+            explorer: FileDialogue::new(),
         }
     }
 
@@ -108,6 +107,68 @@ impl ProjectWindow {
             }
         };
     }
+
+    fn render_main(&mut self, f: &mut Frame, area: Rect) -> Option<Vec<Request>> {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(40), Constraint::Min(3)])
+            .split(area);
+        let title = Paragraph::new("
+
+
+░▒▓████████▓▒░▒▓█▓▒░       ░▒▓██████▓▒░ ░▒▓███████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓████████▓▒░ 
+░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░ 
+░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░    ░▒▓██▓▒░     ░▒▓██▓▒░  
+░▒▓██████▓▒░ ░▒▓█▓▒░      ░▒▓████████▓▒░░▒▓██████▓▒░░▒▓████████▓▒░▒▓██████▓▒░ ░▒▓█▓▒░░▒▓█▓▒░  ░▒▓██▓▒░     ░▒▓██▓▒░    
+░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░░▒▓██▓▒░     ░▒▓██▓▒░      
+░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░        
+░▒▓█▓▒░      ░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓████████▓▒░▒▓████████▓▒░ 
+")
+            .style(
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD) ,
+            )
+            .alignment(Alignment::Center);
+        f.render_widget(title, chunks[0]);
+
+        let project_options_area = chunks[1];
+
+        let items: Vec<ListItem> = self
+            .options
+            .iter()
+            .enumerate()
+            .map(|(i, opt)| {
+                let style = if i == self.selected_index {
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::default()
+                };
+                ListItem::new(Line::from(opt.as_str()).alignment(Alignment::Center)).style(style)
+            })
+            .collect();
+
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .title("Select Option")
+                    .title_alignment(Alignment::Center),
+            )
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .highlight_symbol("> ");
+        f.render_widget(list, project_options_area);
+        None
+    }
+
+    fn render_browser(&mut self, f: &mut Frame, area: Rect) -> Option<Vec<Request>> {
+        let cr = centered_rect::centered_rect(60, 60, area);
+        self.explorer.render(f, cr);
+        None
+    }
 }
 
 impl Window for ProjectWindow {
@@ -126,72 +187,22 @@ impl Window for ProjectWindow {
     }
 
     fn render(&mut self, f: &mut Frame, area: Rect) -> Option<Vec<Request>> {
+        self.render_main(f, area);
         match self.state {
             ProjectWindowState::SelectingAction => {
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Percentage(40), Constraint::Min(3)])
-                    .split(area);
-                let title = Paragraph::new("
-
-
-░▒▓████████▓▒░▒▓█▓▒░       ░▒▓██████▓▒░ ░▒▓███████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓████████▓▒░ 
-░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░ 
-░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░    ░▒▓██▓▒░     ░▒▓██▓▒░  
-░▒▓██████▓▒░ ░▒▓█▓▒░      ░▒▓████████▓▒░░▒▓██████▓▒░░▒▓████████▓▒░▒▓██████▓▒░ ░▒▓█▓▒░░▒▓█▓▒░  ░▒▓██▓▒░     ░▒▓██▓▒░    
-░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░░▒▓██▓▒░     ░▒▓██▓▒░      
-░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░        
-░▒▓█▓▒░      ░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓████████▓▒░▒▓████████▓▒░ 
-")
-            .style(
-                Style::default()
-                    .fg(Color::Magenta)
-                    .add_modifier(Modifier::BOLD) ,
-            )
-            .alignment(Alignment::Center);
-                f.render_widget(title, chunks[0]);
-
-                let project_options_area = chunks[1];
-
-                let items: Vec<ListItem> = self
-                    .options
-                    .iter()
-                    .enumerate()
-                    .map(|(i, opt)| {
-                        let style = if i == self.selected_index {
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::REVERSED)
-                        } else {
-                            Style::default()
-                        };
-                        ListItem::new(Line::from(opt.as_str()).alignment(Alignment::Center))
-                            .style(style)
-                    })
-                    .collect();
-
-                let list = List::new(items)
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title("Select Option")
-                            .title_alignment(Alignment::Center),
-                    )
-                    .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-                    .highlight_symbol("> ");
-                f.render_widget(list, project_options_area);
+                return None;
             }
-            ProjectWindowState::BrowsingForOpen => {
-                // Pass explorer.widget() by reference as suggested by compiler
-                f.render_widget(&self.explorer.widget(), area);
-            }
+            _ => {}
+        }
+        self.render_browser(f, area);
+        match self.state {
             ProjectWindowState::BrowsingForCreate(ref mut v) => {
-                f.render_widget(&self.explorer.widget(), area);
                 if v.is_some() {
                     let centered_area = centered_rect(30, 20, area);
                     v.as_mut().unwrap().render(f, centered_area);
                 }
             }
+            _ => {}
         }
         None
     }
@@ -233,9 +244,7 @@ impl Window for ProjectWindow {
                         InputDialogueResult::Submit(str) => {
                             // create a directory called str in the current directory of the
                             // ratatui_explorer and setup project inside of it
-                            let selected_file_info =
-                                &self.explorer.files()[self.explorer.selected_idx()];
-                            let project_path_buf = selected_file_info.path().to_path_buf();
+                            let project_path_buf = self.explorer.get_selected();
                             let new_project_path = project_path_buf.join(str);
                             match create_project_structure(&new_project_path) {
                                 Ok(_) => {
@@ -251,40 +260,26 @@ impl Window for ProjectWindow {
                         }
                     }
                 } else {
-                    let r_event = ratatui::crossterm::event::Event::Key(key);
-                    if key.code == crossterm::event::KeyCode::Enter {
-                        if self.explorer.selected_idx() < self.explorer.files().len() {
-                            let selected_file_info =
-                                &self.explorer.files()[self.explorer.selected_idx()];
-                            // For "Create New Project", we expect to select a directory where the project will be created.
-                            // The selected path itself becomes the project root.
-                            if selected_file_info.is_dir() {
-                                // Ensure selection is a directory for these actions
-                                self.state = ProjectWindowState::BrowsingForCreate(Some(
-                                    InputDialogue::new(
-                                        "Create Project".to_string(),
-                                        "Enter project name:".to_string(),
-                                    ),
-                                ));
-                            } else {
-                                // User pressed Enter on a file, not a directory. Show a popup.
+                    match self.explorer.handle_input(key) {
+                        FileDialogueResult::Continue => {}
+                        FileDialogueResult::Select(p) => {
+                            // check if p is directory
+                            if p.is_file() {
                                 return Some(vec![Request::Popup(crate::popup::Popup::new(
                                     crate::popup::PopupType::Info,
-                                    "Please select a directory.".to_string(),
+                                    "Please select a directory for project operations.".to_string(),
                                 ))]);
+                            }
+                            if p.is_dir() {
+                                self.state =
+                                    ProjectWindowState::BrowsingForCreate(Some(InputDialogue::new(
+                                        "Create New Project".to_string(),
+                                        "Enter project name:".to_string(),
+                                    )))
                             }
                         }
-                    } else {
-                        match self.explorer.handle(&r_event) {
-                            Ok(()) => {}
-                            Err(_e) => {
-                                // std::io::Error
-                                self.state = ProjectWindowState::SelectingAction;
-                                return Some(vec![Request::Popup(crate::popup::Popup::new(
-                                    crate::popup::PopupType::Warning,
-                                    format!("File browser error: {}", _e), // Include error
-                                ))]);
-                            }
+                        FileDialogueResult::Cancel => {
+                            self.state = ProjectWindowState::SelectingAction;
                         }
                     }
                 }
@@ -292,18 +287,24 @@ impl Window for ProjectWindow {
             ProjectWindowState::BrowsingForOpen => {
                 // key is crossterm::event::KeyEvent.
                 // ratatui_explorer expects ratatui::crossterm::event::Event.
-                let r_event = ratatui::crossterm::event::Event::Key(key);
-                if key.code == crossterm::event::KeyCode::Enter {
-                    if self.explorer.selected_idx() < self.explorer.files().len() {
-                        let selected_file_info =
-                            &self.explorer.files()[self.explorer.selected_idx()];
-                        let project_path_buf = selected_file_info.path().to_path_buf();
-                        // For "Open Existing Project", we expect to select the project root directory.
-                        if selected_file_info.is_dir() {
+                match self.explorer.handle_input(key) {
+                    FileDialogueResult::Cancel => {
+                        self.state = ProjectWindowState::SelectingAction;
+                        return None;
+                    }
+                    FileDialogueResult::Continue => {}
+                    FileDialogueResult::Select(p) => {
+                        // check if p is directory
+                        if p.is_file() {
+                            return Some(vec![Request::Popup(crate::popup::Popup::new(
+                                crate::popup::PopupType::Info,
+                                "Please select a directory for project operations.".to_string(),
+                            ))]);
+                        }
+                        if p.is_dir() {
                             // Ensure selection is a directory for these actions
-                            self.state = ProjectWindowState::SelectingAction;
-                            match validate_project_structure(&project_path_buf) {
-                                Ok(_) => return self.set_current_dir(&project_path_buf),
+                            match validate_project_structure(&p) {
+                                Ok(_) => return self.set_current_dir(&p),
                                 Err(e) => {
                                     return Some(vec![Request::Popup(crate::popup::Popup::new(
                                         crate::popup::PopupType::Warning,
@@ -311,34 +312,8 @@ impl Window for ProjectWindow {
                                     ))])
                                 }
                             }
-                        } else {
-                            // User pressed Enter on a file, not a directory. Show a popup.
-                            return Some(vec![Request::Popup(crate::popup::Popup::new(
-                                crate::popup::PopupType::Info,
-                                "Please select a directory for project operations.".to_string(),
-                            ))]);
                         }
                     }
-                } else {
-                    match self.explorer.handle(&r_event) {
-                        // Pass reference to the event
-                        Ok(()) => {
-                            // handle returns Ok(()) on success
-                            // Check for Enter key press specifically to trigger action
-                        }
-                        Err(_e) => {
-                            // std::io::Error
-                            self.state = ProjectWindowState::SelectingAction;
-                            return Some(vec![Request::Popup(crate::popup::Popup::new(
-                                crate::popup::PopupType::Warning,
-                                format!("File browser error: {}", _e), // Include error
-                            ))]);
-                        }
-                    }
-                }
-
-                if key.code == crossterm::event::KeyCode::Esc {
-                    self.state = ProjectWindowState::SelectingAction;
                 }
             }
         }
@@ -347,8 +322,8 @@ impl Window for ProjectWindow {
     fn capture_all_input(&self) -> bool {
         // This window captures all input events
         match self.state {
-            ProjectWindowState::BrowsingForCreate(ref v) => v.is_some(),
-            _ => false,
+            ProjectWindowState::SelectingAction => false,
+            _ => true,
         }
     }
 }
