@@ -9,6 +9,7 @@ use crossterm::event::KeyEvent;
 
 use ratatui::{prelude::*, widgets::*};
 
+use std::any::Any;
 use std::fs;
 use std::path::Path;
 
@@ -18,71 +19,27 @@ use flashfuzzemu::opts::EmuOpts;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "for_fuzzer")]
 use serde_json;
-pub fn create_project_structure(project_path: &Path) -> Result<(), String> {
-    let corpus_path = project_path.join("corpus");
-    let crashes_path = project_path.join("crashes");
-    let config_file = project_path.join("config.json");
-    let grammar_file = project_path.join("grammar.json");
 
-    fs::create_dir_all(&corpus_path)
-        .map_err(|e| format!("Failed to create corpus directory: {}", e))?;
-    fs::create_dir_all(&crashes_path)
-        .map_err(|e| format!("Failed to create crashes directory: {}", e))?;
-    fs::File::create(&config_file).map_err(|e| format!("Failed to create config.json: {}", e))?;
-    fs::File::create(&grammar_file).map_err(|e| format!("Failed to create grammar.json: {}", e))?;
-    #[cfg(feature = "for_fuzzer")]
-    {
-        // create a dummy config.json using emuopts defaults
-        let write_str =
-            serde_json::to_string_pretty(&EmuOpts::default()).map_err(|e| e.to_string())?;
-        fs::write(&config_file, write_str).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-pub fn validate_project_structure(project_path: &Path) -> Result<(), String> {
-    let corpus_path = project_path.join("corpus");
-    let crashes_path = project_path.join("crashes");
-    let config_file = project_path.join("config.json");
-    let grammar_file = project_path.join("grammar.json");
-
-    if !corpus_path.is_dir() {
-        return Err("Corpus directory not found.".to_string());
-    }
-    if !crashes_path.is_dir() {
-        return Err("Crashes directory not found.".to_string());
-    }
-    if !config_file.is_file() {
-        return Err("config.json not found.".to_string());
-    }
-    if !grammar_file.is_file() {
-        return Err("grammar.json not found.".to_string());
-    }
-    Ok(())
-}
-
-enum ProjectWindowState {
-    SelectingAction,
-    BrowsingForCreate(Option<InputDialogue>),
+enum ProjectWindowState<'a> {
+    SelectingAction(ListState),
+    BrowsingForCreate(Option<InputDialogue<'a>>),
     BrowsingForOpen,
 }
 
-pub struct ProjectWindow {
-    selected_index: usize,
+pub struct ProjectWindow<'a> {
     options: Vec<String>,
-    state: ProjectWindowState,
+    state: ProjectWindowState<'a>,
     explorer: FileDialogue,
 }
 
-impl ProjectWindow {
+impl<'a> ProjectWindow<'a> {
     pub fn new() -> Self {
         Self {
-            selected_index: 0,
             options: vec![
                 "Create New Project".to_string(),
                 "Open Existing Project".to_string(),
             ],
-            state: ProjectWindowState::SelectingAction,
+            state: ProjectWindowState::SelectingAction(ListState::default().with_selected(Some(0))),
             explorer: FileDialogue::new(),
         }
     }
@@ -91,6 +48,11 @@ impl ProjectWindow {
         match std::env::set_current_dir(&path) {
             Ok(_) => {
                 return Some(vec![
+                    Request::PushProperty(
+                        "project_name".into(),
+                        Box::new(String::from(path.file_name().unwrap().to_str().unwrap()))
+                            as Box<dyn Any>,
+                    ),
                     Request::PopWindow,
                     Request::PushWindow(Box::new(MainWindow::new())),
                     Request::Popup(crate::popup::Popup::new(
@@ -111,11 +73,14 @@ impl ProjectWindow {
     fn render_main(&mut self, f: &mut Frame, area: Rect) -> Option<Vec<Request>> {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(40), Constraint::Min(3)])
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(9),
+                Constraint::Fill(1),
+                Constraint::Min(3),
+            ])
             .split(area);
         let title = Paragraph::new("
-
-
 ░▒▓████████▓▒░▒▓█▓▒░       ░▒▓██████▓▒░ ░▒▓███████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓████████▓▒░ 
 ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░ 
 ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░    ░▒▓██▓▒░     ░▒▓██▓▒░  
@@ -126,20 +91,23 @@ impl ProjectWindow {
 ")
             .style(
                 Style::default()
-                    .fg(Color::Magenta)
+                    .fg(Color::Indexed(33))
                     .add_modifier(Modifier::BOLD) ,
             )
             .alignment(Alignment::Center);
-        f.render_widget(title, chunks[0]);
+        f.render_widget(title, chunks[1]);
 
-        let project_options_area = chunks[1];
-
+        let project_options_area = chunks[3];
+        let selected_index = match self.state {
+            ProjectWindowState::SelectingAction(ref l) => l.selected().unwrap_or(0),
+            _ => 0,
+        };
         let items: Vec<ListItem> = self
             .options
             .iter()
             .enumerate()
             .map(|(i, opt)| {
-                let style = if i == self.selected_index {
+                let style = if i == selected_index {
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::REVERSED)
@@ -160,7 +128,11 @@ impl ProjectWindow {
             )
             .highlight_style(Style::default().add_modifier(Modifier::BOLD))
             .highlight_symbol("> ");
-        f.render_widget(list, project_options_area);
+        let liststate = match self.state {
+            ProjectWindowState::SelectingAction(ref mut i) => i,
+            _ => &mut ListState::default(),
+        };
+        f.render_stateful_widget(list, project_options_area, liststate);
         None
     }
 
@@ -171,10 +143,10 @@ impl ProjectWindow {
     }
 }
 
-impl Window for ProjectWindow {
+impl<'a> Window for ProjectWindow<'a> {
     fn name(&self) -> &str {
         match self.state {
-            ProjectWindowState::SelectingAction => "Project Setup",
+            ProjectWindowState::SelectingAction(_) => "Project Setup",
             ProjectWindowState::BrowsingForCreate(ref v) => {
                 if v.is_some() {
                     "Create Project - Enter project name"
@@ -189,7 +161,7 @@ impl Window for ProjectWindow {
     fn render(&mut self, f: &mut Frame, area: Rect) -> Option<Vec<Request>> {
         self.render_main(f, area);
         match self.state {
-            ProjectWindowState::SelectingAction => {
+            ProjectWindowState::SelectingAction(_) => {
                 return None;
             }
             _ => {}
@@ -210,19 +182,15 @@ impl Window for ProjectWindow {
     fn handle_input(&mut self, key: KeyEvent) -> Option<Vec<Request>> {
         // key is crossterm::event::KeyEvent
         match self.state {
-            ProjectWindowState::SelectingAction => match key.code {
+            ProjectWindowState::SelectingAction(ref mut l) => match key.code {
                 crossterm::event::KeyCode::Up | crossterm::event::KeyCode::Char('k') => {
-                    if self.selected_index > 0 {
-                        self.selected_index -= 1;
-                    }
+                    l.select_previous();
                 }
                 crossterm::event::KeyCode::Down | crossterm::event::KeyCode::Char('j') => {
-                    if self.selected_index < self.options.len() - 1 {
-                        self.selected_index += 1;
-                    }
+                    l.select_next();
                 }
                 crossterm::event::KeyCode::Enter => {
-                    let selected_option = &self.options[self.selected_index];
+                    let selected_option = &self.options[l.selected().unwrap_or(0)];
                     match selected_option.as_str() {
                         "Create New Project" => {
                             self.state = ProjectWindowState::BrowsingForCreate(None)
@@ -279,7 +247,9 @@ impl Window for ProjectWindow {
                             }
                         }
                         FileDialogueResult::Cancel => {
-                            self.state = ProjectWindowState::SelectingAction;
+                            self.state = ProjectWindowState::SelectingAction(
+                                ListState::default().with_selected(Some(0)),
+                            );
                         }
                     }
                 }
@@ -289,7 +259,9 @@ impl Window for ProjectWindow {
                 // ratatui_explorer expects ratatui::crossterm::event::Event.
                 match self.explorer.handle_input(key) {
                     FileDialogueResult::Cancel => {
-                        self.state = ProjectWindowState::SelectingAction;
+                        self.state = ProjectWindowState::SelectingAction(
+                            ListState::default().with_selected(Some(0)),
+                        );
                         return None;
                     }
                     FileDialogueResult::Continue => {}
@@ -322,18 +294,59 @@ impl Window for ProjectWindow {
     fn capture_all_input(&self) -> bool {
         // This window captures all input events
         match self.state {
-            ProjectWindowState::SelectingAction => false,
+            ProjectWindowState::SelectingAction(_) => false,
             _ => true,
         }
     }
 }
 
-// Tests module remains unchanged
+pub fn create_project_structure(project_path: &Path) -> Result<(), String> {
+    let corpus_path = project_path.join("corpus");
+    let crashes_path = project_path.join("crashes");
+    let config_file = project_path.join("config.json");
+    let grammar_file = project_path.join("grammar.json");
+
+    fs::create_dir_all(&corpus_path)
+        .map_err(|e| format!("Failed to create corpus directory: {}", e))?;
+    fs::create_dir_all(&crashes_path)
+        .map_err(|e| format!("Failed to create crashes directory: {}", e))?;
+    fs::File::create(&config_file).map_err(|e| format!("Failed to create config.json: {}", e))?;
+    fs::File::create(&grammar_file).map_err(|e| format!("Failed to create grammar.json: {}", e))?;
+    #[cfg(feature = "for_fuzzer")]
+    {
+        // create a dummy config.json using emuopts defaults
+        let write_str =
+            serde_json::to_string_pretty(&EmuOpts::default()).map_err(|e| e.to_string())?;
+        fs::write(&config_file, write_str).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+pub fn validate_project_structure(project_path: &Path) -> Result<(), String> {
+    let corpus_path = project_path.join("corpus");
+    let crashes_path = project_path.join("crashes");
+    let config_file = project_path.join("config.json");
+    let grammar_file = project_path.join("grammar.json");
+
+    if !corpus_path.is_dir() {
+        return Err("Corpus directory not found.".to_string());
+    }
+    if !crashes_path.is_dir() {
+        return Err("Crashes directory not found.".to_string());
+    }
+    if !config_file.is_file() {
+        return Err("config.json not found.".to_string());
+    }
+    if !grammar_file.is_file() {
+        return Err("grammar.json not found.".to_string());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs::{self, File};
-    use std::io::Write;
     use tempfile::tempdir;
 
     #[test]

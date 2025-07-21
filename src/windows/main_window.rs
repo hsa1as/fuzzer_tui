@@ -1,26 +1,25 @@
 // windows/main_window.rs
 use crate::app::Request;
-use crate::popup::{Popup, PopupType};
 use crate::window::Window; // Removed WindowTransition
 use crate::windows::config::ConfigWindow;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::*, widgets::*};
 
 pub struct MainWindow {
-    selected: usize,
     options: Vec<String>,
+    list_state: ListState,
 }
 
 impl MainWindow {
     pub fn new() -> Self {
         Self {
-            selected: 0,
             options: vec![
                 "Static analysis".into(),
                 "Fuzz !".into(),
                 "Config".into(),
                 "Quit".into(),
             ],
+            list_state: ListState::default().with_selected(Some(0)),
         }
     }
 }
@@ -38,8 +37,6 @@ impl Window for MainWindow {
             .split(area);
 
         let title = Paragraph::new("
-
-
 ░▒▓████████▓▒░▒▓█▓▒░       ░▒▓██████▓▒░ ░▒▓███████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓████████▓▒░ 
 ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░ 
 ░▒▓█▓▒░      ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░    ░▒▓██▓▒░     ░▒▓██▓▒░  
@@ -50,18 +47,18 @@ impl Window for MainWindow {
 ")
             .style(
                 Style::default()
-                    .fg(Color::Magenta)
+                    .fg(Color::Indexed(33))
                     .add_modifier(Modifier::BOLD) ,
             )
             .alignment(Alignment::Center);
         f.render_widget(title, vertical_chunks[0]);
-
+        let selected = self.list_state.selected().unwrap_or(0);
         let items: Vec<ListItem> = self
             .options
             .iter()
             .enumerate()
             .map(|(i, opt)| {
-                let style = if i == self.selected {
+                let style = if i == selected {
                     Style::default()
                         .fg(Color::Yellow)
                         .add_modifier(Modifier::REVERSED)
@@ -89,20 +86,20 @@ impl Window for MainWindow {
     fn handle_input(&mut self, key: KeyEvent) -> Option<Vec<Request>> {
         let mut ret = None;
         match key.code {
-            KeyCode::Up => {
-                if self.selected > 0 {
-                    self.selected -= 1;
-                }
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.list_state.select_previous();
             }
-            KeyCode::Down => {
-                if self.selected < self.options.len() - 1 {
-                    self.selected += 1;
-                }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.list_state.select_next();
             }
             KeyCode::Enter => {
-                if &self.options[self.selected] == "Config" {
+                let selected = self.list_state.selected().unwrap_or(0);
+                if &self.options[selected] == "Config" {
                     // Config
                     ret = Some(vec![Request::PushWindow(Box::new(ConfigWindow::new()))]);
+                }
+                if &self.options[selected] == "Fuzz !" {
+                    //ret = Some(vec![Request::PushWindow(Box::new(FuzzingWindow::new()))]);
                 }
             }
             _ => {}

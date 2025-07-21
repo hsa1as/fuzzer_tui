@@ -1,4 +1,5 @@
 // app.rs
+#![allow(dead_code)]
 use crate::utils::centered_rect::centered_rect;
 use crate::{
     popup::*,
@@ -6,36 +7,33 @@ use crate::{
     windows::project_window::ProjectWindow, // Added
 };
 use crossterm::event::KeyEvent;
+use ratatui::widgets::{Block, BorderType, Borders};
 use ratatui::{prelude::*, widgets::Paragraph, Frame};
+use std::any::Any;
 use std::collections::{HashMap, VecDeque};
-
-pub trait Property: std::fmt::Debug {
-    fn id(&self) -> &str;
-    fn as_any(&self) -> &dyn std::any::Any;
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
-}
 
 pub enum Request {
     Popup(Popup),
     PushWindow(Box<dyn Window>), // New request to push a window
     PopWindow,
+    PushProperty(String, Box<dyn Any>), // New request to push a property
 }
 
 pub struct App {
     window_stack: VecDeque<Box<dyn Window>>,
-    pub properties: HashMap<String, Box<dyn Property>>,
+    pub properties: HashMap<String, Box<dyn Any>>,
     popup: Option<Popup>,
 }
 
 impl App {
     pub fn new() -> Self {
-        // Removed initial_window parameter
-        let mut stack: VecDeque<Box<dyn Window>> = VecDeque::new(); // Explicitly typed
-                                                                    // Push ProjectWindow first
-        stack.push_back(Box::new(ProjectWindow::new())); // Coercion will happen here
+        let mut stack: VecDeque<Box<dyn Window>> = VecDeque::new();
+        stack.push_back(Box::new(ProjectWindow::new()));
+        let mut properties: HashMap<String, Box<dyn Any>> = HashMap::new();
+        properties.insert("port".into(), Box::new(1337u64) as Box<dyn Any>); // Default port
         App {
             window_stack: stack,
-            properties: HashMap::new(),
+            properties,
             popup: None,
         }
     }
@@ -83,8 +81,8 @@ impl App {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),
-                Constraint::Min(0),
+                Constraint::Length(1),
+                Constraint::Fill(1),
                 Constraint::Length(3),
             ])
             .split(area); // Changed from size
@@ -100,20 +98,7 @@ impl App {
         f.render_widget(header, chunks[0]);
 
         // Footer
-        let name = self
-            .window_stack
-            .back()
-            .map(|w| w.name())
-            .unwrap_or("Unknown Window");
-        let footer = Paragraph::new(name)
-            .style(
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::ITALIC),
-            )
-            .alignment(Alignment::Center);
-        f.render_widget(footer, chunks[2]);
-
+        self.render_footer(f, chunks[2]);
         // Current window
         if let Some(current) = self.window_stack.back_mut() {
             let v = current.render(f, chunks[1]);
@@ -144,6 +129,82 @@ impl App {
                 } else {
                 }
             }
+            Request::PushProperty(s, p) => {
+                self.properties.insert(s, p);
+            }
         }
+    }
+
+    fn render_footer(&mut self, f: &mut Frame, area: Rect) {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 3); 3])
+            .split(area); // Changed from size
+
+        // Current window
+        let window_name = self
+            .window_stack
+            .back()
+            .map(|w| w.name())
+            .unwrap_or("Unknown Window");
+
+        // Attempt to get the current port
+        let port = self
+            .properties
+            .get("port")
+            .and_then(|p| p.downcast_ref::<u64>())
+            .map_or("1337".to_string(), |p| p.to_string());
+
+        // Get current project name
+        let project = self
+            .properties
+            .get("project_name")
+            .and_then(|p| p.downcast_ref::<String>())
+            .map_or("No project".to_string(), |p| p.clone());
+
+        // Make paragraph widgets
+        let window_para = Paragraph::new(window_name)
+            .alignment(Alignment::Center)
+            .block(
+                Block::new()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::ITALIC),
+                    ),
+            );
+
+        let project_para = Paragraph::new(format!("Project: {}", project))
+            .alignment(Alignment::Center)
+            .block(
+                Block::new()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(
+                        Style::default()
+                            .fg(Color::Indexed(6))
+                            .add_modifier(Modifier::ITALIC),
+                    ),
+            );
+
+        let port_para = Paragraph::new(format!("Port: {}", port))
+            .alignment(Alignment::Center)
+            .block(
+                Block::new()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded)
+                    .style(
+                        Style::default()
+                            .fg(Color::Indexed(6))
+                            .add_modifier(Modifier::ITALIC),
+                    ),
+            );
+
+        // Render
+        f.render_widget(project_para, chunks[0]);
+        f.render_widget(window_para, chunks[1]);
+        f.render_widget(port_para, chunks[2]);
     }
 }

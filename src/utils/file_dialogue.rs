@@ -1,12 +1,9 @@
 use std::path::PathBuf;
 
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{palette::tailwind::SLATE, Color, Modifier, Style, Stylize},
-    widgets::{
-        Block, BorderType, Borders, Clear, List, ListItem, ListState, Padding, Paragraph,
-        StatefulWidget, Widget,
-    },
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Padding},
     Frame,
 };
 

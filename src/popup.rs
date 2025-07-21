@@ -63,7 +63,7 @@ impl Window for Popup {
 
     fn render(&mut self, f: &mut Frame, popup_area: Rect) -> Option<Vec<Request>> {
         f.render_widget(Clear, popup_area);
-        let mut ret = None;
+        let ret = None;
         let block = Block::default()
             .title(self.popup_type.title())
             .title_style(self.popup_type.style())
@@ -80,8 +80,8 @@ impl Window for Popup {
         ret
     }
 
-    fn handle_input(&mut self, key: KeyEvent) -> Option<Vec<Request>> {
-        let mut ret = None;
-        ret
+    fn handle_input(&mut self, _key: KeyEvent) -> Option<Vec<Request>> {
+        // always close
+        Some(vec![Request::PopWindow])
     }
 }
