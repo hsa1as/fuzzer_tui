@@ -51,12 +51,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "825297538d77367557b912770ca3083f778a196054b3ee63b22673c4a3cae0a5"
 
 [[package]]
-name = "atomic_refcell"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41e67cd8309bbd06cd603a9e693a784ac2e5d1e955f11286e355089fcab3047c"
-
-[[package]]
 name = "autocfg"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -451,7 +445,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "udbserver",
  "unicorn-engine",
 ]
 
@@ -488,20 +481,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tui-textarea",
-]
-
-[[package]]
-name = "gdbstub"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71d66e32caf5dd59f561be0143e413e01d651bd8498eb9aa0be8c482c81c8d31"
-dependencies = [
- "bitflags",
- "cfg-if",
- "log",
- "managed",
- "num-traits",
- "paste",
 ]
 
 [[package]]
@@ -802,12 +781,6 @@ checksum = "b823e83b2affd8f40a9ee8c29dbc56404c1e34cd2710921f2801e2cf29527afa"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "managed"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
 
 [[package]]
 name = "memchr"
@@ -1265,15 +1238,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "singlyton"
-version = "4.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d920bedcb124f2e219f9e8401e252f3ed013370d9c19fd7ae9c6fe2266db35ec"
-dependencies = [
- "atomic_refcell",
-]
-
-[[package]]
 name = "siphasher"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1391,17 +1355,6 @@ name = "typenum"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
-
-[[package]]
-name = "udbserver"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c39f0897e1c78e7d4880f9d096cad397d7ed0cdb91926be6ce981b290fbb4773"
-dependencies = [
- "gdbstub",
- "singlyton",
- "unicorn-engine",
-]
 
 [[package]]
 name = "uds"

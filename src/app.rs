@@ -152,7 +152,7 @@ impl App {
         let port = self
             .properties
             .get("port")
-            .and_then(|p| p.downcast_ref::<u64>())
+            .and_then(|p| p.downcast_ref::<u16>())
             .map_or("1337".to_string(), |p| p.to_string());
 
         // Get current project name

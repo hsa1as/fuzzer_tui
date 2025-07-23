@@ -19,20 +19,22 @@ use crate::window::Window;
 #[cfg(feature = "for_fuzzer")]
 use flashfuzzemu::opts::EmuOpts;
 
-pub enum ConfigWindowState {
+pub enum ConfigWindowState<'a> {
     Main(ListState),
     ManualConfig,
     FromScript(FileDialogue),
+    SelectBinary(FileDialogue),
+    SetPort(InputDialogue<'a>),
 }
 
-pub struct ConfigWindow {
-    state: ConfigWindowState,
+pub struct ConfigWindow<'a> {
+    state: ConfigWindowState<'a>,
     config_file: Option<PathBuf>,
     config_tx: TextArea<'static>,
     options: Vec<String>,
 }
 
-impl ConfigWindow {
+impl<'a> ConfigWindow<'a> {
     pub fn new() -> Self {
         let mut config_tx = TextArea::default();
         let tx_block = Block::new()
@@ -141,6 +143,36 @@ impl ConfigWindow {
         return ret;
     }
 
+    fn render_select_binary(
+        &mut self,
+        f: &mut ratatui::prelude::Frame,
+        area: ratatui::prelude::Rect,
+    ) -> Option<Vec<Request>> {
+        let mut ret = self.render_main(f, area);
+        let centered = centered_rect::centered_rect(60, 60, area);
+        if let ConfigWindowState::SelectBinary(ref mut file_dialogue) = self.state {
+            f.render_widget(Clear, centered);
+            file_dialogue.render(f, centered);
+        }
+        // display file dialogue
+        return ret;
+    }
+
+    fn render_set_port(
+        &mut self,
+        f: &mut ratatui::prelude::Frame,
+        area: ratatui::prelude::Rect,
+    ) -> Option<Vec<Request>> {
+        let mut ret = self.render_main(f, area);
+        let centered = centered_rect::centered_rect(60, 60, area);
+        if let ConfigWindowState::SetPort(ref mut input_dialogue) = self.state {
+            f.render_widget(Clear, centered);
+            input_dialogue.render(f, centered);
+        }
+        // display input dialogue
+        return ret;
+    }
+
     fn handle_input_manual(&mut self, key: crossterm::event::KeyEvent) -> Option<Vec<Request>> {
         match key.code {
             crossterm::event::KeyCode::Esc => {
@@ -175,12 +207,14 @@ impl ConfigWindow {
     }
 }
 
-impl Window for ConfigWindow {
+impl<'a> Window for ConfigWindow<'a> {
     fn capture_all_input(&self) -> bool {
         match self.state {
             ConfigWindowState::Main(_) => false,
             ConfigWindowState::ManualConfig => true,
             ConfigWindowState::FromScript(_) => true,
+            ConfigWindowState::SelectBinary(_) => true,
+            ConfigWindowState::SetPort(_) => true,
         }
     }
     fn name(&self) -> &str {
@@ -188,6 +222,8 @@ impl Window for ConfigWindow {
             ConfigWindowState::Main(_) => "Configuration Menu",
             ConfigWindowState::ManualConfig => "Configuration Menu: Manual config",
             ConfigWindowState::FromScript(_) => "Configuration Menu: From Script",
+            ConfigWindowState::SelectBinary(_) => "Configuration Menu: Selecting Binary",
+            ConfigWindowState::SetPort(_) => "Configuration Menu: Selecting port",
         }
     }
     fn render(
@@ -200,6 +236,8 @@ impl Window for ConfigWindow {
                 self.render_main(f, area)
             }
             ConfigWindowState::FromScript(_) => self.render_from_script(f, area),
+            ConfigWindowState::SelectBinary(_) => self.render_select_binary(f, area),
+            ConfigWindowState::SetPort(_) => self.render_set_port(f, area),
         }
     }
 
@@ -223,8 +261,17 @@ impl Window for ConfigWindow {
                         self.state = ConfigWindowState::FromScript(FileDialogue::new());
                         return None;
                     }
-                    if &self.options[selected_idx] == "Select Binary" {}
-                    if &self.options[selected_idx] == "Set Port" {}
+                    if &self.options[selected_idx] == "Select Binary" {
+                        self.state = ConfigWindowState::SelectBinary(FileDialogue::new());
+                        return None;
+                    }
+                    if &self.options[selected_idx] == "Set Port" {
+                        self.state = ConfigWindowState::SetPort(InputDialogue::new(
+                            "Set Port".to_string(),
+                            "Enter the port number:".to_string(),
+                        ));
+                        return None;
+                    }
                     if &self.options[selected_idx] == "Done" {
                         match self.save_config() {
                             Ok(msg) => {
@@ -258,6 +305,51 @@ impl Window for ConfigWindow {
                         self.state =
                             ConfigWindowState::Main(ListState::default().with_selected(Some(0)));
                         // Go back to main after cancel
+                    }
+                }
+            }
+
+            ConfigWindowState::SelectBinary(ref mut file_dialogue) => {
+                match file_dialogue.handle_input(key) {
+                    FileDialogueResult::Continue => {}
+                    FileDialogueResult::Select(input) => {
+                        self.state =
+                            ConfigWindowState::Main(ListState::default().with_selected(Some(0)));
+                        // Go back to main after submission
+                        ret = Some(vec![Request::PushProperty(
+                            "binary_path".to_string(),
+                            Box::new(input) as Box<dyn std::any::Any>,
+                        )]);
+                    }
+                    FileDialogueResult::Cancel => {
+                        self.state =
+                            ConfigWindowState::Main(ListState::default().with_selected(Some(0)));
+                        // Go back to main after cancel
+                    }
+                }
+            }
+            ConfigWindowState::SetPort(ref mut input_dialogue) => {
+                match input_dialogue.handle_input(key) {
+                    InputDialogueResult::Continue => {}
+                    InputDialogueResult::Submit(input) => {
+                        // Handle port submission
+                        if let Ok(port) = input.parse::<u16>() {
+                            ret = Some(vec![Request::PushProperty(
+                                "port".to_string(),
+                                Box::new(port) as Box<dyn std::any::Any>,
+                            )]);
+                        } else {
+                            ret = Some(vec![Request::Popup(Popup::new(
+                                PopupType::Warning,
+                                "Invalid port number".to_string(),
+                            ))]);
+                        }
+                        self.state =
+                            ConfigWindowState::Main(ListState::default().with_selected(Some(0)));
+                    }
+                    InputDialogueResult::Cancel => {
+                        self.state =
+                            ConfigWindowState::Main(ListState::default().with_selected(Some(0)));
                     }
                 }
             }
