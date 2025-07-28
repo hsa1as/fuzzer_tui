@@ -114,10 +114,12 @@ impl FileDialogue {
                             self.cwd = PathBuf::from("/");
                         }
                         self.get_list();
+                        self.state.select_first();
                     }
                     'l' => {
                         // go into currently selected directory
                         self.select_current_dir();
+                        self.state.select_first();
                     }
                     'q' => {
                         // return
@@ -141,10 +143,12 @@ impl FileDialogue {
                     self.cwd = PathBuf::from("/");
                 }
                 self.get_list();
+                self.state.select_first();
             }
             crossterm::event::KeyCode::Right => {
                 // go into currently selected directory
                 self.select_current_dir();
+                self.state.select_first();
             }
             crossterm::event::KeyCode::Down => {
                 self.state.select_next();

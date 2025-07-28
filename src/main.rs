@@ -1,4 +1,5 @@
 // main.rs
+// TODO: Option<Vec<Request>> is the stupidest thing i have done
 mod app;
 mod popup;
 mod utils;

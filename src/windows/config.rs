@@ -273,17 +273,38 @@ impl<'a> Window for ConfigWindow<'a> {
                         return None;
                     }
                     if &self.options[selected_idx] == "Done" {
+                        let mut ret: Option<Vec<Request>> = None;
+                        let mut ret_vec = vec![];
                         match self.save_config() {
                             Ok(msg) => {
-                                ret = Some(vec![
-                                    Request::PopWindow,
-                                    Request::Popup(Popup::new(PopupType::Info, msg)),
-                                ]);
+                                ret_vec.push(Request::Popup(Popup::new(PopupType::Info, msg)));
                             }
                             Err(msg) => {
                                 ret =
                                     Some(vec![Request::Popup(Popup::new(PopupType::Warning, msg))]);
                             }
+                        }
+                        #[cfg(feature = "for_fuzzer")]
+                        {
+                            println!("{}", self.config_tx.lines().join("\n"));
+                            let opts = EmuOpts::from_json(self.config_tx.lines().join("\n"));
+                            if let Ok(opts) = opts {
+                                ret_vec.push(Request::PushProperty(
+                                    "emu_opts".to_string(),
+                                    Box::new(opts) as Box<dyn std::any::Any>,
+                                ));
+                            } else {
+                                ret = Some(vec![Request::Popup(Popup::new(
+                                    PopupType::Warning,
+                                    "Invalid EmuOpts configuration".to_string(),
+                                ))]);
+                            }
+                        }
+                        if ret.is_some() {
+                            return ret;
+                        } else {
+                            ret_vec.push(Request::PopWindow);
+                            return Some(ret_vec);
                         }
                     }
                 }

@@ -17,6 +17,7 @@ pub enum Request {
     PushWindow(Box<dyn Window>), // New request to push a window
     PopWindow,
     PushProperty(String, Box<dyn Any>), // New request to push a property
+    GetProperty(String),                // New request to get a property
 }
 
 pub struct App {
@@ -30,7 +31,7 @@ impl App {
         let mut stack: VecDeque<Box<dyn Window>> = VecDeque::new();
         stack.push_back(Box::new(ProjectWindow::new()));
         let mut properties: HashMap<String, Box<dyn Any>> = HashMap::new();
-        properties.insert("port".into(), Box::new(1337u64) as Box<dyn Any>); // Default port
+        properties.insert("port".into(), Box::new(1337u16) as Box<dyn Any>); // Default port
         App {
             window_stack: stack,
             properties,
@@ -131,6 +132,24 @@ impl App {
             }
             Request::PushProperty(s, p) => {
                 self.properties.insert(s, p);
+            }
+            Request::GetProperty(s) => {
+                let p = match self.properties.get(&s) {
+                    None => {
+                        self.window_stack.pop_back();
+                        self.popup = Some(Popup::new(
+                            PopupType::Warning,
+                            format!(
+                                "The requested property was not found in the application state: {}",
+                                s
+                            ),
+                        ));
+                        return;
+                    }
+                    Some(v) => v,
+                };
+                let w = self.window_stack.back_mut().unwrap();
+                w.send_property(s.clone(), &**p);
             }
         }
     }

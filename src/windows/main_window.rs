@@ -5,6 +5,9 @@ use crate::windows::config::ConfigWindow;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::*, widgets::*};
 
+#[cfg(feature = "for_fuzzer")]
+use super::fuzzing_window::FuzzingWindow;
+
 pub struct MainWindow {
     options: Vec<String>,
     list_state: ListState,
@@ -99,7 +102,10 @@ impl Window for MainWindow {
                     ret = Some(vec![Request::PushWindow(Box::new(ConfigWindow::new()))]);
                 }
                 if &self.options[selected] == "Fuzz !" {
-                    //ret = Some(vec![Request::PushWindow(Box::new(FuzzingWindow::new()))]);
+                    #[cfg(feature = "for_fuzzer")]
+                    {
+                        ret = Some(vec![Request::PushWindow(Box::new(FuzzingWindow::new()))]);
+                    }
                 }
             }
             _ => {}

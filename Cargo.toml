@@ -7,6 +7,8 @@ edition = "2021"
 crossterm = "0.28.1" # Downgraded to match ratatui's dependency
 ratatui = "0.29.0"
 flashfuzzemu = { path = "../FlashFuzz/flashfuzzemu" , default-features = false, optional = true}
+flashfuzzer = { path = "../FlashFuzz/flashfuzzer" , optional = true}
+libc = "*"
 serde_json = "*"
 serde = "*"
 tui-textarea = "0.7.0"
@@ -15,7 +17,8 @@ tui-textarea = "0.7.0"
 tempfile = "3.10.1"
 
 [features]
-for_fuzzer = ["flashfuzzemu", "mem_access_rules", "track_unique_bb", "flashfuzzemu/default", "interrupts_list", "grammar_rules"]
+default = ["for_fuzzer"]
+for_fuzzer = ["flashfuzzer", "flashfuzzemu", "mem_access_rules", "track_unique_bb", "flashfuzzemu/default", "interrupts_list", "grammar_rules"]
 interrupts_fixed = ["flashfuzzemu/interrupts_fixed"]
 interrupts_guided = ["flashfuzzemu/interrupts_guided"]
 mem_access_rules = ["flashfuzzemu/mem_access_rules"]

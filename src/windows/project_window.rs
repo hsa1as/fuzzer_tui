@@ -16,8 +16,6 @@ use std::path::Path;
 #[cfg(feature = "for_fuzzer")]
 use flashfuzzemu::opts::EmuOpts;
 #[cfg(feature = "for_fuzzer")]
-use serde::{Deserialize, Serialize};
-#[cfg(feature = "for_fuzzer")]
 use serde_json;
 
 enum ProjectWindowState<'a> {
@@ -212,7 +210,8 @@ impl<'a> Window for ProjectWindow<'a> {
                         InputDialogueResult::Submit(str) => {
                             // create a directory called str in the current directory of the
                             // ratatui_explorer and setup project inside of it
-                            let project_path_buf = self.explorer.get_selected();
+                            let mut project_path_buf = self.explorer.get_selected();
+                            project_path_buf.pop();
                             let new_project_path = project_path_buf.join(str);
                             match create_project_structure(&new_project_path) {
                                 Ok(_) => {
